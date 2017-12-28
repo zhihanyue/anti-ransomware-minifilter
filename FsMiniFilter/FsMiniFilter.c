@@ -176,7 +176,13 @@ _In_ FLT_POST_OPERATION_FLAGS Flags
 
 
 			ULONG ProcessId = FltGetRequestorProcessId(Data);
-			
+			if (gMessage.ClientPort != NULL && ProcessId != gMessage.PID && ProcessId != 4) {
+                ULONG reqLength = sizeof(MESSAGE_REQ);
+                ULONG replyLength = sizeof(MESSAGE_REPLY) + sizeof(FILTER_REPLY_HEADER);
+
+                PMESSAGE_REQ reqBuffer = ExAllocatePoolWithTag(NonPagedPool, reqLength, 'nacS');
+                PMESSAGE_REPLY replyBuffer = ExAllocatePoolWithTag(NonPagedPool, replyLength, 'nacS');
+            }
 			char *out = ToHex(buffer, trueLen);
 			DbgPrint("FileName = %s\n", strFileName.Buffer);
 			DbgPrint("Buffer:\n%s\n", out);
