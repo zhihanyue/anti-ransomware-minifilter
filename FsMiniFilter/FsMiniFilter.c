@@ -176,12 +176,35 @@ _In_ FLT_POST_OPERATION_FLAGS Flags
 
 
 			ULONG ProcessId = FltGetRequestorProcessId(Data);
-			if (gMessage.ClientPort != NULL && ProcessId != gMessage.PID && ProcessId != 4) {
+            if (gMessage.ClientPort != NULL && ProcessId != gMessage.PID && ProcessId != 4) {
                 ULONG reqLength = sizeof(MESSAGE_REQ);
                 ULONG replyLength = sizeof(MESSAGE_REPLY) + sizeof(FILTER_REPLY_HEADER);
 
                 PMESSAGE_REQ reqBuffer = ExAllocatePoolWithTag(NonPagedPool, reqLength, 'nacS');
                 PMESSAGE_REPLY replyBuffer = ExAllocatePoolWithTag(NonPagedPool, replyLength, 'nacS');
+
+                if (reqBuffer == NULL) {
+                    Data->IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
+                    Data->IoStatus.Information = 0;
+                    return FLT_PREOP_COMPLETE;
+                }
+
+                reqBuffer->Type = READ;
+                reqBuffer->PID = ProcessId;
+                for (int i = 0; i < 512; ++i) {
+                    reqBuffer->Filename[i] = strFileName.Buffer[i];
+                    if (strFileName.Buffer[i] == 0) break;
+                }
+                for (int i = 0; i < 256; ++i)
+                    reqBuffer->Contents[i] = 0;
+                for (unsigned i = 0; i < trueLen; ++i)
+                    ++ reqBuffer->Contents[buffer[i]];
+
+                status = FltSendMessage(gMessage.Filter, &gMessage.ClientPort, reqBuffer
+                    , reqLength, replyBuffer, &replyLength, NULL);
+
+                if (STATUS_SUCCESS != status)
+                    DbgPrint("!!! couldn't send message to user-mode to scan file, status 0x%X\n", status);
             }
 			char *out = ToHex(buffer, trueLen);
 			DbgPrint("FileName = %s\n", strFileName.Buffer);
