@@ -233,9 +233,23 @@ _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
 {
 	UNREFERENCED_PARAMETER(FltObjects);
 	UNREFERENCED_PARAMETER(CompletionContext);
+    DbgPrint("BEGIN WRITE\n");
 
-	DbgPrint("BEGIN WRITE\n");
+    NTSTATUS status;
+    PFLT_FILE_NAME_INFORMATION pNameInfo = NULL;
 
+    status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &pNameInfo);
+
+    if (FsMiniFilterDoRequestOperationStatus(Data)) {
+        status = FltRequestOperationStatusCallback(Data,
+            FsMiniFilterOperationStatusCallback,
+            (PVOID)(++OperationStatusCtx));
+        if (!NT_SUCCESS(status)) {
+            PT_DBG_PRINT(PTDBG_TRACE_OPERATION_STATUS,
+                ("FsMiniFilter!FsMiniFilterPreOperation: FltRequestOperationStatusCallback Failed, status=%08x\n",
+                status));
+        }
+    }
 	return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }
 
