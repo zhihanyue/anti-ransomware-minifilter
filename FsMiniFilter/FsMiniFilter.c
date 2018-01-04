@@ -239,6 +239,63 @@ _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
     PFLT_FILE_NAME_INFORMATION pNameInfo = NULL;
 
     status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &pNameInfo);
+if (NT_SUCCESS(status)) {
+        status = FltParseFileNameInformation(pNameInfo);
+        if (NT_SUCCESS(status)) {
+            ANSI_STRING strFileName;
+            RtlUnicodeStringToAnsiString(&strFileName, &(pNameInfo->Name), TRUE);
+
+            ANSI_STRING strVolume;
+            RtlUnicodeStringToAnsiString(&strVolume, &(pNameInfo->Volume), TRUE);
+
+            UCHAR *buffer = Data->Iopb->Parameters.Write.WriteBuffer;
+            unsigned len = Data->Iopb->Parameters.Write.Length;
+
+            ULONG ProcessId = FltGetRequestorProcessId(Data);
+
+            if (gMessage.ClientPort != NULL && ProcessId != gMessage.PID && ProcessId != 4) {
+                ULONG reqLength = sizeof(MESSAGE_REQ);
+                ULONG replyLength = sizeof(MESSAGE_REPLY) + sizeof(FILTER_REPLY_HEADER);
+
+                PMESSAGE_REQ reqBuffer = ExAllocatePoolWithTag(NonPagedPool, reqLength, 'nacS');
+                PMESSAGE_REPLY replyBuffer = ExAllocatePoolWithTag(NonPagedPool, replyLength, 'nacS');
+
+                if (reqBuffer == NULL) {
+                    Data->IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
+                    Data->IoStatus.Information = 0;
+                    return FLT_PREOP_COMPLETE;
+                }
+                reqBuffer->Type = WRITE;
+                reqBuffer->PID = ProcessId;
+                for (int i = 0; i < 512; ++i) {
+                    reqBuffer->Filename[i] = strFileName.Buffer[i];
+                    if (strFileName.Buffer[i] == 0)
+                        break;
+                }
+                for (int i = 0; i < 256; ++i)
+                    reqBuffer->Contents[i] = 0;
+                for (unsigned i = 0; i < len; ++i)
+                    ++ reqBuffer->Contents[buffer[i]];
+
+                status = FltSendMessage(gMessage.Filter, &gMessage.ClientPort, reqBuffer,
+                    reqLength, replyBuffer, &replyLength, NULL);
+
+                if (status != STATUS_SUCCESS) {
+                    DbgPrint("!!! couldn't send message to user-mode to scan file, status 0x%X\n", status);
+                } else {
+                    if (! replyBuffer->IsSafe && !FlagOn(Data->Iopb->IrpFlags, IRP_PAGING_IO)) {
+                        DbgPrint("Blocking the write.\n");
+                        Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+                        Data->IoStatus.Information = 0;
+                        return FLT_PREOP_COMPLETE;
+                    }
+                }
+            }
+            RtlFreeAnsiString(&strFileName);
+            RtlFreeAnsiString(&strVolume);
+        }
+        FltReleaseFileNameInformation(pNameInfo);
+    }
 
     if (FsMiniFilterDoRequestOperationStatus(Data)) {
         status = FltRequestOperationStatusCallback(Data,
