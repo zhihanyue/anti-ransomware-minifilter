@@ -325,6 +325,19 @@ _Inout_ PFLT_CALLBACK_DATA Data,
 _In_ PCFLT_RELATED_OBJECTS FltObjects,
 _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
 ) {
+        int isDel = (Data->Iopb->Parameters.Create.Options & FILE_DELETE_ON_CLOSE);
+    ULONG ProcessId = FltGetRequestorProcessId(Data);
+    if (FsMiniFilterDoRequestOperationStatus(Data)) {
+        status = FltRequestOperationStatusCallback(Data,
+            FsMiniFilterOperationStatusCallback,
+            (PVOID)(++OperationStatusCtx));
+
+        if (!NT_SUCCESS(status)) {
+            PT_DBG_PRINT(PTDBG_TRACE_OPERATION_STATUS,
+                ("FsMiniFilter!FsMiniFilterPreOperation: FltRequestOperationStatusCallback Failed, status=%08x\n",
+                status));
+        }
+    }
 	return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }
 
