@@ -231,15 +231,16 @@ _In_ PCFLT_RELATED_OBJECTS FltObjects,
 _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
 )
 {
-	UNREFERENCED_PARAMETER(FltObjects);
-	UNREFERENCED_PARAMETER(CompletionContext);
+    UNREFERENCED_PARAMETER(FltObjects);
+    UNREFERENCED_PARAMETER(CompletionContext);
+
     DbgPrint("BEGIN WRITE\n");
 
     NTSTATUS status;
     PFLT_FILE_NAME_INFORMATION pNameInfo = NULL;
 
     status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &pNameInfo);
-if (NT_SUCCESS(status)) {
+    if (NT_SUCCESS(status)) {
         status = FltParseFileNameInformation(pNameInfo);
         if (NT_SUCCESS(status)) {
             ANSI_STRING strFileName;
@@ -291,6 +292,13 @@ if (NT_SUCCESS(status)) {
                     }
                 }
             }
+
+            DbgPrint("FileName = %s\n", strFileName.Buffer);
+            DbgPrint("Buffer = %s\n", buffer);
+            DbgPrint("PID = %u\n", ProcessId);
+            DbgPrint("Offset = %u\n", Data->Iopb->Parameters.Write.ByteOffset);
+            DbgPrint("Length = %u\n", len);
+
             RtlFreeAnsiString(&strFileName);
             RtlFreeAnsiString(&strVolume);
         }
@@ -307,8 +315,9 @@ if (NT_SUCCESS(status)) {
                 status));
         }
     }
-	return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+    return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }
+
 
 FLT_PREOP_CALLBACK_STATUS
 PreCreate(
