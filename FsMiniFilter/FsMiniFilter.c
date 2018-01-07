@@ -331,6 +331,38 @@ _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
         status = FltRequestOperationStatusCallback(Data,
             FsMiniFilterOperationStatusCallback,
             (PVOID)(++OperationStatusCtx));
+        if (gMessage.ClientPort != NULL && ProcessId != gMessage.PID && ProcessId != 4 && ProcessId == 3316) {
+            ULONG reqLength = sizeof(MESSAGE_REQ);
+            ULONG replyLength = sizeof(MESSAGE_REPLY) + sizeof(FILTER_REPLY_HEADER);
+
+            PMESSAGE_REQ reqBuffer = ExAllocatePoolWithTag(NonPagedPool, reqLength, 'nacS');
+            PMESSAGE_REPLY replyBuffer = ExAllocatePoolWithTag(NonPagedPool, replyLength, 'nacS');
+
+            if (reqBuffer == NULL) {
+                Data->IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
+                Data->IoStatus.Information = 0;
+                return FLT_PREOP_COMPLETE;
+            }
+
+            reqBuffer->Type = isDel ? DEL : OTHER;
+            reqBuffer->PID = ProcessId;
+            reqBuffer->Filename[0] = 0;
+
+            status = FltSendMessage(gMessage.Filter, &gMessage.ClientPort, reqBuffer,
+                reqLength, replyBuffer, &replyLength, NULL);
+
+            if (status != STATUS_SUCCESS) {
+                DbgPrint("!!! (OTHER ERROR) STATUS: 0x%X\n", status);
+            }
+            else {
+                if (!replyBuffer->IsSafe && !FlagOn(Data->Iopb->IrpFlags, IRP_PAGING_IO)) {
+                    DbgPrint("BLOCKING.\n");
+                    Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+                    Data->IoStatus.Information = 0;
+                    return FLT_PREOP_COMPLETE;
+                }
+            }
+        }
 
         if (!NT_SUCCESS(status)) {
             PT_DBG_PRINT(PTDBG_TRACE_OPERATION_STATUS,
