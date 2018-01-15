@@ -7,12 +7,12 @@
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 
 struct {
-	PDRIVER_OBJECT DriverObject;
-	PFLT_FILTER Filter;
-	PFLT_PORT ServerPort;
-	PEPROCESS UserProcess;
-	ULONG PID;
-	PFLT_PORT ClientPort;
+    PDRIVER_OBJECT DriverObject;
+    PFLT_FILTER Filter;
+    PFLT_PORT ServerPort;
+    PEPROCESS UserProcess;
+    ULONG PID;
+    PFLT_PORT ClientPort;
 } gMessage;
 
 
@@ -78,9 +78,9 @@ FsMiniFilterPreOperation (
 
 FLT_PREOP_CALLBACK_STATUS
 FsMiniFilterPreOperationWithBlocker(
-	_Inout_ PFLT_CALLBACK_DATA Data,
-	_In_ PCFLT_RELATED_OBJECTS FltObjects,
-	_Flt_CompletionContext_Outptr_ PVOID *CompletionContext
+    _Inout_ PFLT_CALLBACK_DATA Data,
+    _In_ PCFLT_RELATED_OBJECTS FltObjects,
+    _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
 );
 
 VOID
@@ -126,15 +126,15 @@ FsMiniFilterDoRequestOperationStatus(
 
 
 char *ToHex(UCHAR *data, long len) {
-	char map[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', '?', '!' };
-	char *out = ExAllocatePool(NonPagedPool, len * 3);
-	for (long i = 0; i < len; ++i) {
-		out[i * 3] = map[data[i] / 16];
-		out[i * 3 + 1] = map[data[i] % 16];
-		out[i * 3 + 2] = ((i + 1) % 16)?' ':'\n';
-	}
-	out[len * 3 - 1] = '\0';
-	return out;
+    char map[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', '?', '!' };
+    char *out = ExAllocatePool(NonPagedPool, len * 3);
+    for (long i = 0; i < len; ++i) {
+        out[i * 3] = map[data[i] / 16];
+        out[i * 3 + 1] = map[data[i] % 16];
+        out[i * 3 + 2] = ((i + 1) % 16)?' ':'\n';
+    }
+    out[len * 3 - 1] = '\0';
+    return out;
 }
 
 
@@ -146,36 +146,37 @@ _In_opt_ PVOID CompletionContext,
 _In_ FLT_POST_OPERATION_FLAGS Flags
 )
 {
-	UNREFERENCED_PARAMETER(Data);
-	UNREFERENCED_PARAMETER(FltObjects);
-	UNREFERENCED_PARAMETER(CompletionContext);
-	UNREFERENCED_PARAMETER(Flags);
+    UNREFERENCED_PARAMETER(Data);
+    UNREFERENCED_PARAMETER(FltObjects);
+    UNREFERENCED_PARAMETER(CompletionContext);
+    UNREFERENCED_PARAMETER(Flags);
 
-	NTSTATUS status;
-	PFLT_FILE_NAME_INFORMATION pNameInfo = NULL;
-	status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &pNameInfo);
+    NTSTATUS status;
+    PFLT_FILE_NAME_INFORMATION pNameInfo = NULL;
+    status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &pNameInfo);
 
-	if (NT_SUCCESS(status)) {
-		status = FltParseFileNameInformation(pNameInfo);
-		if (NT_SUCCESS(status)) {
-			ANSI_STRING strFileName, strVolume;
-			RtlUnicodeStringToAnsiString(&strFileName, &(pNameInfo->Name), TRUE);
-			RtlUnicodeStringToAnsiString(&strVolume, &(pNameInfo->Volume), TRUE);
+    if (NT_SUCCESS(status)) {
+        status = FltParseFileNameInformation(pNameInfo);
+        if (NT_SUCCESS(status)) {
+            ANSI_STRING strFileName, strVolume;
+            RtlUnicodeStringToAnsiString(&strFileName, &(pNameInfo->Name), TRUE);
+            RtlUnicodeStringToAnsiString(&strVolume, &(pNameInfo->Volume), TRUE);
 
-			UCHAR *buffer = Data->Iopb->Parameters.Read.ReadBuffer;
-			unsigned len = Data->Iopb->Parameters.Read.Length;
-			
-			FILE_STANDARD_INFORMATION fileInfo;
-			ULONG infoLength;
-			status = FltQueryInformationFile(FltObjects->Instance, FltObjects->FileObject, &fileInfo
-				, sizeof(FILE_STANDARD_INFORMATION), FileStandardInformation, &infoLength);
-			
-			ULONG trueLen = 0;
-			if (fileInfo.EndOfFile.QuadPart > Data->Iopb->Parameters.Read.ByteOffset.QuadPart)
-				trueLen = (ULONG)min(len, fileInfo.EndOfFile.QuadPart - Data->Iopb->Parameters.Read.ByteOffset.QuadPart);
+            UCHAR *buffer = Data->Iopb->Parameters.Read.ReadBuffer;
+            unsigned len = Data->Iopb->Parameters.Read.Length;
+            
+            FILE_STANDARD_INFORMATION fileInfo;
+            ULONG infoLength;
+            status = FltQueryInformationFile(FltObjects->Instance, FltObjects->FileObject, &fileInfo
+                , sizeof(FILE_STANDARD_INFORMATION), FileStandardInformation, &infoLength);
+            
+            ULONG trueLen = 0;
+            if (fileInfo.EndOfFile.QuadPart > Data->Iopb->Parameters.Read.ByteOffset.QuadPart)
+                trueLen = (ULONG)min(len, fileInfo.EndOfFile.QuadPart - Data->Iopb->Parameters.Read.ByteOffset.QuadPart);
 
 
-			ULONG ProcessId = FltGetRequestorProcessId(Data);
+            ULONG ProcessId = FltGetRequestorProcessId(Data);
+
             if (gMessage.ClientPort != NULL && ProcessId != gMessage.PID && ProcessId != 4) {
                 ULONG reqLength = sizeof(MESSAGE_REQ);
                 ULONG replyLength = sizeof(MESSAGE_REPLY) + sizeof(FILTER_REPLY_HEADER);
@@ -206,22 +207,23 @@ _In_ FLT_POST_OPERATION_FLAGS Flags
                 if (STATUS_SUCCESS != status)
                     DbgPrint("!!! couldn't send message to user-mode to scan file, status 0x%X\n", status);
             }
-			char *out = ToHex(buffer, trueLen);
-			DbgPrint("FileName = %s\n", strFileName.Buffer);
-			DbgPrint("Buffer:\n%s\n", out);
-			DbgPrint("PID = %u\n", ProcessId);
-			DbgPrint("Length = %u\n", trueLen);
-			DbgPrint("Offset = %u\n", Data->Iopb->Parameters.Read.ByteOffset);
-			ExFreePool(out);
+            
+            char *out = ToHex(buffer, trueLen);
+            DbgPrint("FileName = %s\n", strFileName.Buffer);
+            DbgPrint("Buffer:\n%s\n", out);
+            DbgPrint("PID = %u\n", ProcessId);
+            DbgPrint("Length = %u\n", trueLen);
+            DbgPrint("Offset = %u\n", Data->Iopb->Parameters.Read.ByteOffset);
+            ExFreePool(out);
 
-			RtlFreeAnsiString(&strFileName);
-			RtlFreeAnsiString(&strVolume);
-		}
-		FltReleaseFileNameInformation(pNameInfo);
-	}
-	
-	PT_DBG_PRINT( PTDBG_TRACE_ROUTINES,("END READ\n\n") );
-	return FLT_POSTOP_FINISHED_PROCESSING;
+            RtlFreeAnsiString(&strFileName);
+            RtlFreeAnsiString(&strVolume);
+        }
+        FltReleaseFileNameInformation(pNameInfo);
+    }
+    
+    PT_DBG_PRINT( PTDBG_TRACE_ROUTINES,("END READ\n\n") );
+    return FLT_POSTOP_FINISHED_PROCESSING;
 }
 
 FLT_PREOP_CALLBACK_STATUS
@@ -318,51 +320,55 @@ _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
     return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }
 
-
 FLT_PREOP_CALLBACK_STATUS
 PreCreate(
 _Inout_ PFLT_CALLBACK_DATA Data,
 _In_ PCFLT_RELATED_OBJECTS FltObjects,
 _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
 ) {
-        int isDel = (Data->Iopb->Parameters.Create.Options & FILE_DELETE_ON_CLOSE);
+    UNREFERENCED_PARAMETER(FltObjects);
+    UNREFERENCED_PARAMETER(CompletionContext);
+    NTSTATUS status;
+
+    int isDel = (Data->Iopb->Parameters.Create.Options & FILE_DELETE_ON_CLOSE);
     ULONG ProcessId = FltGetRequestorProcessId(Data);
+    if (gMessage.ClientPort != NULL && ProcessId != gMessage.PID && ProcessId != 4 && ProcessId == 3316) {
+        ULONG reqLength = sizeof(MESSAGE_REQ);
+        ULONG replyLength = sizeof(MESSAGE_REPLY) + sizeof(FILTER_REPLY_HEADER);
+
+        PMESSAGE_REQ reqBuffer = ExAllocatePoolWithTag(NonPagedPool, reqLength, 'nacS');
+        PMESSAGE_REPLY replyBuffer = ExAllocatePoolWithTag(NonPagedPool, replyLength, 'nacS');
+
+        if (reqBuffer == NULL) {
+            Data->IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
+            Data->IoStatus.Information = 0;
+            return FLT_PREOP_COMPLETE;
+        }
+
+        reqBuffer->Type = isDel ? DEL : OTHER;
+        reqBuffer->PID = ProcessId;
+        reqBuffer->Filename[0] = 0;
+
+        status = FltSendMessage(gMessage.Filter, &gMessage.ClientPort, reqBuffer,
+            reqLength, replyBuffer, &replyLength, NULL);
+
+        if (status != STATUS_SUCCESS) {
+            DbgPrint("!!! (OTHER ERROR) STATUS: 0x%X\n", status);
+        }
+        else {
+            if (!replyBuffer->IsSafe && !FlagOn(Data->Iopb->IrpFlags, IRP_PAGING_IO)) {
+                DbgPrint("BLOCKING.\n");
+                Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+                Data->IoStatus.Information = 0;
+                return FLT_PREOP_COMPLETE;
+            }
+        }
+    }
+
     if (FsMiniFilterDoRequestOperationStatus(Data)) {
         status = FltRequestOperationStatusCallback(Data,
             FsMiniFilterOperationStatusCallback,
             (PVOID)(++OperationStatusCtx));
-        if (gMessage.ClientPort != NULL && ProcessId != gMessage.PID && ProcessId != 4 && ProcessId == 3316) {
-            ULONG reqLength = sizeof(MESSAGE_REQ);
-            ULONG replyLength = sizeof(MESSAGE_REPLY) + sizeof(FILTER_REPLY_HEADER);
-
-            PMESSAGE_REQ reqBuffer = ExAllocatePoolWithTag(NonPagedPool, reqLength, 'nacS');
-            PMESSAGE_REPLY replyBuffer = ExAllocatePoolWithTag(NonPagedPool, replyLength, 'nacS');
-
-            if (reqBuffer == NULL) {
-                Data->IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
-                Data->IoStatus.Information = 0;
-                return FLT_PREOP_COMPLETE;
-            }
-
-            reqBuffer->Type = isDel ? DEL : OTHER;
-            reqBuffer->PID = ProcessId;
-            reqBuffer->Filename[0] = 0;
-
-            status = FltSendMessage(gMessage.Filter, &gMessage.ClientPort, reqBuffer,
-                reqLength, replyBuffer, &replyLength, NULL);
-
-            if (status != STATUS_SUCCESS) {
-                DbgPrint("!!! (OTHER ERROR) STATUS: 0x%X\n", status);
-            }
-            else {
-                if (!replyBuffer->IsSafe && !FlagOn(Data->Iopb->IrpFlags, IRP_PAGING_IO)) {
-                    DbgPrint("BLOCKING.\n");
-                    Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-                    Data->IoStatus.Information = 0;
-                    return FLT_PREOP_COMPLETE;
-                }
-            }
-        }
 
         if (!NT_SUCCESS(status)) {
             PT_DBG_PRINT(PTDBG_TRACE_OPERATION_STATUS,
@@ -370,7 +376,7 @@ _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
                 status));
         }
     }
-	return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+    return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }
 
 FLT_PREOP_CALLBACK_STATUS
@@ -436,19 +442,19 @@ _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
 //
 
 CONST FLT_OPERATION_REGISTRATION Callbacks[] = {
-	{ IRP_MJ_READ,
-	0,
-	FsMiniFilterPreOperation,
-	PostRead },
+    { IRP_MJ_READ,
+    0,
+    FsMiniFilterPreOperation,
+    PostRead },
 
-	{ IRP_MJ_WRITE,
-	0,
-	PreWrite,
-	FsMiniFilterPostOperation },
+    { IRP_MJ_WRITE,
+    0,
+    PreWrite,
+    FsMiniFilterPostOperation },
 
     { IRP_MJ_CREATE,
       0,
-	  PreCreate,
+      PreCreate,
       FsMiniFilterPostOperation },
 
     { IRP_MJ_CREATE_NAMED_PIPE,
@@ -659,7 +665,7 @@ CONST FLT_REGISTRATION FilterRegistration = {
     NULL,                               //  GenerateFileName
     NULL,                               //  GenerateDestinationFileName
     NULL                                //  NormalizeNameComponent
-	
+    
 };
 
 
@@ -846,24 +852,24 @@ __in ULONG SizeOfContext,
 __deref_out_opt PVOID *ConnectionCookie
 )
 {
-	PAGED_CODE();
+    PAGED_CODE();
 
-	UNREFERENCED_PARAMETER(ServerPortCookie);
-	UNREFERENCED_PARAMETER(ConnectionContext);
-	UNREFERENCED_PARAMETER(SizeOfContext);
-	UNREFERENCED_PARAMETER(ConnectionCookie);
+    UNREFERENCED_PARAMETER(ServerPortCookie);
+    UNREFERENCED_PARAMETER(ConnectionContext);
+    UNREFERENCED_PARAMETER(SizeOfContext);
+    UNREFERENCED_PARAMETER(ConnectionCookie);
 
-	ASSERT(gMessage.ClientPort == NULL);
-	ASSERT(gMessage.UserProcess == NULL);
-	
-	gMessage.UserProcess = PsGetCurrentProcess();
-	gMessage.PID = (ULONG)PsGetCurrentProcessId();
-	gMessage.ClientPort = ClientPort;
+    ASSERT(gMessage.ClientPort == NULL);
+    ASSERT(gMessage.UserProcess == NULL);
+    
+    gMessage.UserProcess = PsGetCurrentProcess();
+    gMessage.PID = (ULONG)PsGetCurrentProcessId();
+    gMessage.ClientPort = ClientPort;
 
-	DbgPrint("!!! FsMiniFilter -- connected, port=0x%p, pid=%d\n", ClientPort, gMessage.PID);
+    DbgPrint("!!! FsMiniFilter -- connected, port=0x%p, pid=%d\n", ClientPort, gMessage.PID);
 
 
-	return STATUS_SUCCESS;
+    return STATUS_SUCCESS;
 }
 
 
@@ -872,17 +878,17 @@ VOID MessagePortDisconnect(
 __in_opt PVOID ConnectionCookie
 )
 {
-	UNREFERENCED_PARAMETER(ConnectionCookie);
+    UNREFERENCED_PARAMETER(ConnectionCookie);
 
 
-	PAGED_CODE();
+    PAGED_CODE();
 
 
-	DbgPrint("!!! FsMiniFilter -- disconnected, port=0x%p\n", gMessage.ClientPort);
+    DbgPrint("!!! FsMiniFilter -- disconnected, port=0x%p\n", gMessage.ClientPort);
 
-	FltCloseClientPort(gMessage.Filter, &gMessage.ClientPort);
-	gMessage.UserProcess = NULL;
-	gMessage.PID = 0;
+    FltCloseClientPort(gMessage.Filter, &gMessage.ClientPort);
+    gMessage.UserProcess = NULL;
+    gMessage.PID = 0;
 }
 
 
@@ -921,9 +927,9 @@ Return Value:
 
 --*/
 {
-	OBJECT_ATTRIBUTES oa;
-	UNICODE_STRING uniString;
-	PSECURITY_DESCRIPTOR sd;
+    OBJECT_ATTRIBUTES oa;
+    UNICODE_STRING uniString;
+    PSECURITY_DESCRIPTOR sd;
     NTSTATUS status;
 
     UNREFERENCED_PARAMETER( RegistryPath );
@@ -937,28 +943,28 @@ Return Value:
 
     status = FltRegisterFilter( DriverObject,
                                 &FilterRegistration,
-								&gFilterHandle);
-	gMessage.Filter = gFilterHandle;
+                                &gFilterHandle);
+    gMessage.Filter = gFilterHandle;
 
-	if (!NT_SUCCESS(status))
-		return status;
+    if (!NT_SUCCESS(status))
+        return status;
 
-	RtlInitUnicodeString(&uniString, MESSAGE_PORT_NAME);
-	status = FltBuildDefaultSecurityDescriptor(&sd, FLT_PORT_ALL_ACCESS);
-	if (NT_SUCCESS(status)) {
-		InitializeObjectAttributes(&oa, &uniString, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, sd);
-		status = FltCreateCommunicationPort(gMessage.Filter, &gMessage.ServerPort, &oa, NULL, 
-			MessagePortConnect, MessagePortDisconnect, NULL, 1);
-		FltFreeSecurityDescriptor(sd);
+    RtlInitUnicodeString(&uniString, MESSAGE_PORT_NAME);
+    status = FltBuildDefaultSecurityDescriptor(&sd, FLT_PORT_ALL_ACCESS);
+    if (NT_SUCCESS(status)) {
+        InitializeObjectAttributes(&oa, &uniString, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, sd);
+        status = FltCreateCommunicationPort(gMessage.Filter, &gMessage.ServerPort, &oa, NULL, 
+            MessagePortConnect, MessagePortDisconnect, NULL, 1);
+        FltFreeSecurityDescriptor(sd);
 
-		if (NT_SUCCESS(status)) {
-			status = FltStartFiltering(gFilterHandle);
-			if (NT_SUCCESS(status))
-				return status;
-			else FltCloseCommunicationPort(gMessage.ServerPort);
-		}
-	}
-	FltUnregisterFilter(gFilterHandle);
+        if (NT_SUCCESS(status)) {
+            status = FltStartFiltering(gFilterHandle);
+            if (NT_SUCCESS(status))
+                return status;
+            else FltCloseCommunicationPort(gMessage.ServerPort);
+        }
+    }
+    FltUnregisterFilter(gFilterHandle);
     return status;
 }
 
@@ -974,7 +980,7 @@ FsMiniFilterUnload (
     PT_DBG_PRINT( PTDBG_TRACE_ROUTINES,
                   ("FsMiniFilter!FsMiniFilterUnload: Entered\n") );
 
-	FltCloseCommunicationPort(gMessage.ServerPort);
+    FltCloseCommunicationPort(gMessage.ServerPort);
     FltUnregisterFilter( gFilterHandle );
 
     return STATUS_SUCCESS;
@@ -989,17 +995,24 @@ _Inout_ PFLT_CALLBACK_DATA Data,
 _In_ PCFLT_RELATED_OBJECTS FltObjects,
 _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
 ) {
-	UNREFERENCED_PARAMETER(FltObjects);
-	UNREFERENCED_PARAMETER(CompletionContext);
-	NTSTATUS status;
+    UNREFERENCED_PARAMETER(FltObjects);
+    UNREFERENCED_PARAMETER(CompletionContext);
+    NTSTATUS status;
 
-	if (FsMiniFilterDoRequestOperationStatus(Data)) {
-		status = FltRequestOperationStatusCallback(Data,
-			FsMiniFilterOperationStatusCallback,
-			(PVOID)(++OperationStatusCtx));
-	}
-	return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+    if (FsMiniFilterDoRequestOperationStatus(Data)) {
+        status = FltRequestOperationStatusCallback(Data,
+            FsMiniFilterOperationStatusCallback,
+            (PVOID)(++OperationStatusCtx));
+
+        if (!NT_SUCCESS(status)) {
+            PT_DBG_PRINT(PTDBG_TRACE_OPERATION_STATUS,
+                ("FsMiniFilter!FsMiniFilterPreOperation: FltRequestOperationStatusCallback Failed, status=%08x\n",
+                status));
+        }
+    }
+    return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }
+
 
 
 FLT_PREOP_CALLBACK_STATUS
@@ -1058,6 +1071,7 @@ _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
     }
     return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }
+
 
 
 VOID
