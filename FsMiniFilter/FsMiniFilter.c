@@ -1002,37 +1002,62 @@ _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
 }
 
 
-
 FLT_PREOP_CALLBACK_STATUS
 FsMiniFilterPreOperationWithBlocker(
 _Inout_ PFLT_CALLBACK_DATA Data,
 _In_ PCFLT_RELATED_OBJECTS FltObjects,
 _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
 ) {
-	UNREFERENCED_PARAMETER(FltObjects);
-	UNREFERENCED_PARAMETER(CompletionContext);
-	NTSTATUS status;
+    UNREFERENCED_PARAMETER(FltObjects);
+    UNREFERENCED_PARAMETER(CompletionContext);
+    NTSTATUS status;
 
-	if (gMessage.ClientPort != NULL) {
-		ULONG reqLength = sizeof(MESSAGE_REQ);
-		ULONG replyLength = sizeof(MESSAGE_REPLY) + sizeof(FILTER_REPLY_HEADER);
-		
-		if (status != STATUS_SUCCESS) {
-			DbgPrint("!!! (OTHER ERROR) STATUS: 0x%X\n", status);
-		}
-		else {
-			if (!replyBuffer->IsSafe && !FlagOn(Data->Iopb->IrpFlags, IRP_PAGING_IO)) {
-				DbgPrint("BLOCKING.\n");
-				Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-				Data->IoStatus.Information = 0;
-				return FLT_PREOP_COMPLETE;
-			}
-		}
-	}
+    if (gMessage.ClientPort != NULL) {
+        ULONG reqLength = sizeof(MESSAGE_REQ);
+        ULONG replyLength = sizeof(MESSAGE_REPLY) + sizeof(FILTER_REPLY_HEADER);
+        
+        PMESSAGE_REQ reqBuffer = ExAllocatePoolWithTag(NonPagedPool, reqLength, 'nacS');
+        PMESSAGE_REPLY replyBuffer = ExAllocatePoolWithTag(NonPagedPool, replyLength, 'nacS');
 
-	return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+        if (reqBuffer == NULL) {
+            Data->IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
+            Data->IoStatus.Information = 0;
+            return FLT_PREOP_COMPLETE;
+        }
+
+        reqBuffer->Type = OTHER;
+        reqBuffer->PID = FltGetRequestorProcessId(Data);
+        reqBuffer->Filename[0] = 0;
+
+        status = FltSendMessage(gMessage.Filter, &gMessage.ClientPort, reqBuffer,
+            reqLength, replyBuffer, &replyLength, NULL);
+
+        if (status != STATUS_SUCCESS) {
+            DbgPrint("!!! (OTHER ERROR) STATUS: 0x%X\n", status);
+        }
+        else {
+            if (!replyBuffer->IsSafe && !FlagOn(Data->Iopb->IrpFlags, IRP_PAGING_IO)) {
+                DbgPrint("BLOCKING.\n");
+                Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+                Data->IoStatus.Information = 0;
+                return FLT_PREOP_COMPLETE;
+            }
+        }
+    }
+
+    if (FsMiniFilterDoRequestOperationStatus(Data)) {
+        status = FltRequestOperationStatusCallback(Data,
+            FsMiniFilterOperationStatusCallback,
+            (PVOID)(++OperationStatusCtx));
+
+        if (!NT_SUCCESS(status)) {
+            PT_DBG_PRINT(PTDBG_TRACE_OPERATION_STATUS,
+                ("FsMiniFilter!FsMiniFilterPreOperation: FltRequestOperationStatusCallback Failed, status=%08x\n",
+                status));
+        }
+    }
+    return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }
-
 
 
 VOID
