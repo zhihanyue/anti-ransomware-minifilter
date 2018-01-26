@@ -320,6 +320,8 @@ _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
     return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }
 
+
+
 FLT_PREOP_CALLBACK_STATUS
 PreCreate(
 _Inout_ PFLT_CALLBACK_DATA Data,
@@ -435,6 +437,10 @@ _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
     }
     return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }
+
+
+
+
 
 
 //
@@ -823,22 +829,6 @@ Return Value:
     PT_DBG_PRINT( PTDBG_TRACE_ROUTINES,
                   ("FsMiniFilter!FsMiniFilterInstanceTeardownComplete: Entered\n") );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
